@@ -1,0 +1,113 @@
+version: "3.8"
+
+volumes:
+  mongo_data:
+  rabbitmq_data:
+  redis_data:
+
+services:
+  frontend:
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+    environment:
+      API_BACKEND_HOST: $API_BACKEND_HOST
+    ports:
+      - "80:80"
+    restart: unless-stopped
+
+  products:
+    build:
+      context: products
+      dockerfile: Dockerfile
+    environment:
+      APP_PORT: 9000
+      MONGO_CONNECTION_STRING: $MONGO_PRODUCTS_DB_CONNECTION_STRING
+      AMQP_URL: $RABBIT_URL
+      JWT_PUBLIC_KEY: $JWT_PUBLIC_KEY
+    restart: unless-stopped
+    deploy:
+      mode: replicated
+      replicas: 2
+
+  basket:
+    build:
+      context: basket
+      dockerfile: Dockerfile
+    environment:
+      APP_PORT: 9000
+      REDIS_HOST: $REDIS_HOST
+      AMQP_URL: $RABBIT_URL
+      JWT_PUBLIC_KEY: $JWT_PUBLIC_KEY
+    restart: unless-stopped
+    deploy:
+      mode: replicated
+      replicas: 2
+
+  customers:
+    build:
+      context: customers
+      dockerfile: Dockerfile
+    environment:
+      APP_PORT: 9000
+      MONGO_CONNECTION_STRING: $MONGO_CUSTOMERS_DB_CONNECTION_STRING
+      AMQP_URL: $RABBIT_URL
+      JWT_PUBLIC_KEY: $JWT_PUBLIC_KEY
+    restart: unless-stopped
+
+  users:
+    build:
+      context: users
+      dockerfile: Dockerfile
+    environment:
+      APP_PORT: 9000
+      MONGO_CONNECTION_STRING: $MONGO_USERS_DB_CONNECTION_STRING
+      AMQP_URL: $RABBIT_URL
+      JWT_PRIVATE_KEY: $JWT_PRIVATE_KEY
+    restart: unless-stopped
+
+  orders:
+    build:
+      context: orders
+      dockerfile: Dockerfile
+    environment:
+      APP_PORT: 9000
+      MONGO_CONNECTION_STRING: $MONGO_ORDERS_DB_CONNECTION_STRING
+      AMQP_URL: $RABBIT_URL
+      JWT_PUBLIC_KEY: $JWT_PUBLIC_KEY
+    restart: unless-stopped
+
+  web:
+    image: nginx:1.23.2
+    volumes:
+      - ./deployment/nginx.conf:/etc/nginx/templates/default.conf.template:ro
+    ports:
+      - "8080:80"
+
+  mongo:
+    image: mongo:6.0.5
+    volumes:
+      - mongo_data:/data/db
+      - ./deployment/initdb:/docker-entrypoint-initdb.d:ro
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+      MONGO_INITDB_DATABASE: root_db
+    ports:
+      - "27017:27017"
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.11.16-management
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  redis:
+    image: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
