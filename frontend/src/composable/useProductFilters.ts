@@ -1,6 +1,10 @@
 import { useRoute } from "vue-router";
 import { ref, watch } from "vue";
 
+interface Specs {
+    [key: string]: string
+}
+
 export function useProductFilters() {
     const route = useRoute()
 
@@ -8,9 +12,11 @@ export function useProductFilters() {
     const brand = ref<string>()
     const minPrice = ref<number>()
     const maxPrice = ref<number>()
+    const specs = ref<Specs>({})
 
     watch(
-        () => ({category: route.query.category, brand: route.query.brand, minPrice: route.query.minPrice, maxPrice: route.query.maxPrice}),
+        // () => ({category: route.query.category, brand: route.query.brand, minPrice: route.query.minPrice, maxPrice: route.query.maxPrice}),
+        () => route.query,
         (newQuery) => {
             if (newQuery.category && typeof newQuery.category === 'string') {
                 category.value = newQuery.category
@@ -32,6 +38,13 @@ export function useProductFilters() {
             } else {
                 maxPrice.value = undefined
             }
+
+            specs.value = {}
+            for (const [spec, value] of Object.entries(newQuery).filter((i) => !['category', 'brand', 'minPrice', 'maxPrice', 'page'].includes(i[0]))) {
+                if (typeof value === 'string') {
+                    specs.value[spec] = value
+                }
+            }
         },
         {
             immediate: true
@@ -42,6 +55,7 @@ export function useProductFilters() {
         category,
         brand,
         minPrice,
-        maxPrice
+        maxPrice,
+        specs
     }
 }

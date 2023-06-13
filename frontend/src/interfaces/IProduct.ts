@@ -41,12 +41,18 @@ export interface PriceBucket {
     count: number
 }
 
+interface SpecFacet {
+    _id: string,
+    values: { value: any, count: number }[]
+}
+
 export interface IProductSearchPage {
     products: IProduct[],
     total: number,
-    minPrice: number|null,
-    maxPrice: number|null,
+    // minPrice: number|null,
+    // maxPrice: number|null,
     categories: Category[],
     brand: Brand[],
-    prices: PriceBucket[]
+    prices: PriceBucket[],
+    specs: SpecFacet[]
 }

@@ -22,7 +22,7 @@ FROM nginx:1.23.2
 COPY --from=builder /build/dist /usr/share/nginx/html
 
 # copy nginx config file
-COPY nginx.conf /etc/nginx/templates/default.conf.template
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # add custom entrypoint to replace API_BACKEND_HOST at runtime
 COPY entrypoint.sh /docker-entrypoint/entrypoint.sh

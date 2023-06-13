@@ -24,7 +24,7 @@ module.exports = fastifyPlugin(async function(fastify, options) {
     const connection = await amqp.connect(config.amqpUrl);
     const channel = await connection.createChannel()
 
-    await channel.assertExchange('product', 'direct')
+    await channel.assertExchange('notification', 'direct')
 
     fastify.addHook('onClose', async () => {
         console.log('Closing amqp connection...')

@@ -1,24 +1,22 @@
 <script setup lang="ts">
 import { useSearchFiltersStore } from "@/stores/searchFilters";
 import { useRoute, useRouter } from "vue-router";
+import { computed } from "vue";
+import map from "lodash/map"
+import orderBy from "lodash/orderBy"
 
 const router = useRouter()
 const route = useRoute()
 const store = useSearchFiltersStore()
 
-// function changeMinPrice(e) {
-//     router.push({
-//         name: 'search_products',
-//         params: {
-//             ...route.params,
-//             page: ''
-//         },
-//         query: {
-//             ...route.query,
-//             minPrice: e.target.value
-//         }
-//     })
-// }
+const specs = computed((): { _id: string, values: { value: any, count: number }[] }[] => {
+    return orderBy(map(store.specs, (spec): typeof store.specs => {
+        return {
+            ...spec,
+            values: orderBy(spec.values, 'count', 'desc')
+        }
+    }), '_id')
+})
 </script>
 
 <template>
@@ -65,6 +63,21 @@ const store = useSearchFiltersStore()
                     <router-link v-if="typeof price._id === 'string'" :to="{name: 'search_products', params: { ...route.params }, query: { ...route.query, minPrice: route.query.minPrice ? undefined : 2000, page: undefined }}">
                         {{ price._id }}
                         <span v-if="!route.query.minPrice" class="is-pulled-right">({{ price.count }})</span>
+                        <span v-else class="delete is-pulled-right"></span>
+                    </router-link>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="block" v-for="spec in specs" :key="spec._id">
+        <h2 class="subtitle">{{ spec._id }}</h2>
+        <div class="menu">
+            <ul class="menu-list">
+                <li v-for="value in spec.values" :key="value.value">
+                    <router-link :to="{name: 'search_products', params: { ...route.params }, query: { ...route.query, [spec._id]: value.value === route.query[spec._id] ? undefined: value.value, page: undefined }}">
+                        {{ value.value }}
+                        <span v-if="value.value !== route.query[spec._id]" class="is-pulled-right">({{ value.count }})</span>
                         <span v-else class="delete is-pulled-right"></span>
                     </router-link>
                 </li>

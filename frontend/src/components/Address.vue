@@ -4,7 +4,6 @@ import { ref } from "vue"
 import { ICustomerAddress } from "@/interfaces/ICustomer"
 import Modal from "@/components/Modal.vue";
 import AddressForm from "@/components/forms/AddressForm.vue";
-import { ad } from "vitest/dist/types-ad1c3f45";
 
 const address = ref<ICustomerAddress|null>(null)
 const showModal = ref(false)

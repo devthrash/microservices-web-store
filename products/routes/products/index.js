@@ -88,7 +88,8 @@ module.exports = async function(fastify, options) {
             category,
             brand,
             minPrice,
-            maxPrice
+            maxPrice,
+            ...specs
         } = request.query
 
         const result = await searchProducts(this.mongo, {
@@ -98,18 +99,20 @@ module.exports = async function(fastify, options) {
             category,
             brand,
             minPrice,
-            maxPrice
+            maxPrice,
+            ...specs
         })
 
         if (!result) {
             return {
                 products: [],
                 total: 0,
-                minPrice: null,
-                maxPrice: null,
+                // minPrice: null,
+                // maxPrice: null,
                 categories: [],
                 brands: [],
-                prices: []
+                prices: [],
+                specs: []
             }
         }
 

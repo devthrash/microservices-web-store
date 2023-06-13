@@ -158,7 +158,8 @@ const searchProductsSchema = {
                 minimum: 0
             }
         },
-        required: ['text']
+        required: ['text'],
+        additionalProperties: true
     },
     response: {
         200: {
@@ -169,18 +170,18 @@ const searchProductsSchema = {
                     items: productOutput
                 },
                 total: { type: 'integer' },
-                minPrice: {
-                    oneOf: [
-                        { type: 'number' },
-                        { type: 'null' }
-                    ]
-                },
-                maxPrice: {
-                    oneOf: [
-                        { type: 'number' },
-                        { type: 'null' }
-                    ]
-                },
+                // minPrice: {
+                //     oneOf: [
+                //         { type: 'number' },
+                //         { type: 'null' }
+                //     ]
+                // },
+                // maxPrice: {
+                //     oneOf: [
+                //         { type: 'number' },
+                //         { type: 'null' }
+                //     ]
+                // },
                 categories: {
                     type: 'array',
                     items: {
@@ -209,6 +210,25 @@ const searchProductsSchema = {
                             _id: { oneOf: [{ type: 'string' }, { type: 'number' }] },
                             maxPrice: { type: 'number' },
                             count: { type: 'integer' }
+                        }
+                    }
+                },
+                specs: {
+                    type: 'array',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            _id: { type: 'string' },
+                            values: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        value: {},
+                                        count: { type: 'integer' }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

@@ -1,0 +1,760 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongo-env
+data:
+  MONGO_INITDB_ROOT_USERNAME: cm9vdA== #root
+  MONGO_INITDB_ROOT_PASSWORD: cm9vdA== #root
+  MONGO_INITDB_DATABASE: cm9vdF9kYg== #root_db
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongo-init
+data:
+  mongo-init.sh: |
+    #!/bin/bash
+    
+    mongosh <<EOF
+    db = db.getSiblingDB('products_db');
+    db.createUser({
+    user: 'products_db_user',
+    pwd: 'ps',
+    roles: [{
+      role: 'readWrite',
+      db: 'products_db'
+    }]
+    })
+    
+    db = db.getSiblingDB('customers_db');
+    db.createUser({
+    user: 'customers_db_user',
+    pwd: 'ps',
+    roles: [{
+      role: 'readWrite',
+      db: 'customers_db'
+    }]
+    })
+    
+    db = db.getSiblingDB('users_db');
+    db.createUser({
+    user: 'users_db_user',
+    pwd: 'ps',
+    roles: [{
+      role: 'readWrite',
+      db: 'users_db'
+    }]
+    })
+    
+    db = db.getSiblingDB('orders_db');
+    db.createUser({
+    user: 'orders_db_user',
+    pwd: 'ps',
+    roles: [{
+      role: 'readWrite',
+      db: 'orders_db'
+    }]
+    })
+    EOF
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongo-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:6.0.5
+          envFrom:
+            - secretRef:
+                name: mongo-env
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - mountPath: /data/db
+              name: mongo-data
+            - name: mongo-init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          resources:
+            requests:
+              memory: 200Mi
+              cpu: 100m
+            limits:
+              memory: 300Mi
+              cpu: 100m
+      volumes:
+        - name: mongo-data
+          persistentVolumeClaim:
+            claimName: mongo-data
+        - name: mongo-init-scripts
+          configMap:
+            name: mongo-init
+            items:
+              - key: mongo-init.sh
+                path: mongo-init.sh
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo
+  labels:
+    app: mongo
+spec:
+  type: ClusterIP
+  selector:
+    app: mongo
+  ports:
+    - port: 27017
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - mountPath: /data
+              name: redis-data
+          resources:
+            requests:
+              memory: 200Mi
+              cpu: 100m
+            limits:
+              memory: 200Mi
+              cpu: 100m
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  type: ClusterIP
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rabbitmq-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq
+          ports:
+            - containerPort: 5672
+          volumeMounts:
+            - mountPath: /var/lib/rabbitmq
+              name: rabbitmq-data
+          resources:
+            requests:
+              memory: 200Mi
+              cpu: 100m
+            limits:
+              memory: 200Mi
+              cpu: 100m
+      volumes:
+        - name: rabbitmq-data
+          persistentVolumeClaim:
+            claimName: rabbitmq-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  labels:
+    app: rabbitmq
+spec:
+  type: ClusterIP
+  selector:
+    app: rabbitmq
+  ports:
+    - port: 5672
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: products-env
+data:
+  AMQP_URL: YW1xcDovL2d1ZXN0Omd1ZXN0QHJhYmJpdG1xOjU2NzI=
+  JWT_PUBLIC_KEY: TFMwdExTMUNSVWRKVGlCUVZVSk1TVU1nUzBWWkxTMHRMUzBOQ2sxSlNVSkpha0ZPUW1kcmNXaHJhVWM1ZHpCQ1FWRkZSa0ZCVDBOQlVUaEJUVWxKUWtOblMwTkJVVVZCYjFvd05VeEZRelZwVWs4MU9Fa3plRVZRZDNBTkNtUXphVE5uVG5sQ0t6TmFOWFZxWTNob01GWXdkekJPYlhocGMwMWxaMkpaVDFoMk5XUnhiMWx4WTNGdmNIQlZiM1ZDUm1OWmRtcFFhM1ZoZDNCeldIY05DbXgwSzJNMmVGbFJjRXA2Y21WMWFVcExhMUZYUVVsQk9WWlphM294VkhveWRqUkZZWEJsS3pSTGFtbEplbFZ6TkZaamIwNWpObk5QY2tKQmJ6WTNNSFlOQ200MVlUUlZWazEyTUVwVE0wd3pZMDltWTA5NlYyMHdSREJSVTNCVGNVVnFjR05zZVd0UGFHWXJXbGRCYlVoYVFtWnBia1oyUTBNMEszUnBVbFJRTUdVTkNqUjBVMmhaVkVGSlZXcG9OelEyV1dZNFluTklhMGgwVmxkWlQyeGphWGxxUlhSd01tMURhRVpKZFZCb05IWjRSMGxuWW1GM04zSlpVVmhaTkRBMWFWa05DbTl6WTFONWIyNU5aemwwSzJOS2JsZEVSaTlsVnpWTWFESklTM2x0WVZFelUwVXZjU3RDV1dabFNEVklUWFo2U1ZJM1YzbzFTa0ZCVTNSRE0ycGxabFVOQ25CM1NVUkJVVUZDRFFvdExTMHRMVVZPUkNCUVZVSk1TVU1nUzBWWkxTMHRMUzA9
+  MONGO_CONNECTION_STRING: bW9uZ29kYjovL3Byb2R1Y3RzX2RiX3VzZXI6cHNAbW9uZ28vcHJvZHVjdHNfZGI=
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: products
+spec:
+  selector:
+    matchLabels:
+      app: products
+  template:
+    metadata:
+      labels:
+        app: products
+    spec:
+      containers:
+        - image: europe-central2-docker.pkg.dev/vast-science-388818/online-shopping-app/products-service
+          name: products
+          env:
+            - name: APP_PORT
+              value: "9000"
+          envFrom:
+            - secretRef:
+                name: products-env
+          ports:
+            - containerPort: 9000
+          resources:
+            requests:
+              memory: 100Mi
+              cpu: 100m
+            limits:
+              memory: 100Mi
+              cpu: 100m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: products
+  labels:
+    app: products
+spec:
+  type: ClusterIP
+  selector:
+    app: products
+  ports:
+    - port: 9000
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: basket-env
+data:
+  AMQP_URL: YW1xcDovL2d1ZXN0Omd1ZXN0QHJhYmJpdG1xOjU2NzI=
+  JWT_PUBLIC_KEY: TFMwdExTMUNSVWRKVGlCUVZVSk1TVU1nUzBWWkxTMHRMUzBOQ2sxSlNVSkpha0ZPUW1kcmNXaHJhVWM1ZHpCQ1FWRkZSa0ZCVDBOQlVUaEJUVWxKUWtOblMwTkJVVVZCYjFvd05VeEZRelZwVWs4MU9Fa3plRVZRZDNBTkNtUXphVE5uVG5sQ0t6TmFOWFZxWTNob01GWXdkekJPYlhocGMwMWxaMkpaVDFoMk5XUnhiMWx4WTNGdmNIQlZiM1ZDUm1OWmRtcFFhM1ZoZDNCeldIY05DbXgwSzJNMmVGbFJjRXA2Y21WMWFVcExhMUZYUVVsQk9WWlphM294VkhveWRqUkZZWEJsS3pSTGFtbEplbFZ6TkZaamIwNWpObk5QY2tKQmJ6WTNNSFlOQ200MVlUUlZWazEyTUVwVE0wd3pZMDltWTA5NlYyMHdSREJSVTNCVGNVVnFjR05zZVd0UGFHWXJXbGRCYlVoYVFtWnBia1oyUTBNMEszUnBVbFJRTUdVTkNqUjBVMmhaVkVGSlZXcG9OelEyV1dZNFluTklhMGgwVmxkWlQyeGphWGxxUlhSd01tMURhRVpKZFZCb05IWjRSMGxuWW1GM04zSlpVVmhaTkRBMWFWa05DbTl6WTFONWIyNU5aemwwSzJOS2JsZEVSaTlsVnpWTWFESklTM2x0WVZFelUwVXZjU3RDV1dabFNEVklUWFo2U1ZJM1YzbzFTa0ZCVTNSRE0ycGxabFVOQ25CM1NVUkJVVUZDRFFvdExTMHRMVVZPUkNCUVZVSk1TVU1nUzBWWkxTMHRMUzA9
+  REDIS_HOST: cmVkaXM=
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: basket
+spec:
+  selector:
+    matchLabels:
+      app: basket
+  template:
+    metadata:
+      labels:
+        app: basket
+    spec:
+      containers:
+        - image: europe-central2-docker.pkg.dev/vast-science-388818/online-shopping-app/basket-service
+          name: products
+          env:
+            - name: APP_PORT
+              value: "9000"
+          envFrom:
+            - secretRef:
+                name: basket-env
+          ports:
+            - containerPort: 9000
+          resources:
+            requests:
+              memory: 0.5Gi
+              cpu: 250m
+            limits:
+              memory: 0.5Gi
+              cpu: 250m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: basket
+  labels:
+    app: basket
+spec:
+  type: ClusterIP
+  selector:
+    app: basket
+  ports:
+    - port: 9000
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: customers-env
+data:
+  AMQP_URL: YW1xcDovL2d1ZXN0Omd1ZXN0QHJhYmJpdG1xOjU2NzI=
+  JWT_PUBLIC_KEY: TFMwdExTMUNSVWRKVGlCUVZVSk1TVU1nUzBWWkxTMHRMUzBOQ2sxSlNVSkpha0ZPUW1kcmNXaHJhVWM1ZHpCQ1FWRkZSa0ZCVDBOQlVUaEJUVWxKUWtOblMwTkJVVVZCYjFvd05VeEZRelZwVWs4MU9Fa3plRVZRZDNBTkNtUXphVE5uVG5sQ0t6TmFOWFZxWTNob01GWXdkekJPYlhocGMwMWxaMkpaVDFoMk5XUnhiMWx4WTNGdmNIQlZiM1ZDUm1OWmRtcFFhM1ZoZDNCeldIY05DbXgwSzJNMmVGbFJjRXA2Y21WMWFVcExhMUZYUVVsQk9WWlphM294VkhveWRqUkZZWEJsS3pSTGFtbEplbFZ6TkZaamIwNWpObk5QY2tKQmJ6WTNNSFlOQ200MVlUUlZWazEyTUVwVE0wd3pZMDltWTA5NlYyMHdSREJSVTNCVGNVVnFjR05zZVd0UGFHWXJXbGRCYlVoYVFtWnBia1oyUTBNMEszUnBVbFJRTUdVTkNqUjBVMmhaVkVGSlZXcG9OelEyV1dZNFluTklhMGgwVmxkWlQyeGphWGxxUlhSd01tMURhRVpKZFZCb05IWjRSMGxuWW1GM04zSlpVVmhaTkRBMWFWa05DbTl6WTFONWIyNU5aemwwSzJOS2JsZEVSaTlsVnpWTWFESklTM2x0WVZFelUwVXZjU3RDV1dabFNEVklUWFo2U1ZJM1YzbzFTa0ZCVTNSRE0ycGxabFVOQ25CM1NVUkJVVUZDRFFvdExTMHRMVVZPUkNCUVZVSk1TVU1nUzBWWkxTMHRMUzA9
+  MONGO_CONNECTION_STRING: bW9uZ29kYjovL2N1c3RvbWVyc19kYl91c2VyOnBzQG1vbmdvL2N1c3RvbWVyc19kYg==
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: customers
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: customers
+  template:
+    metadata:
+      labels:
+        app: customers
+    spec:
+      containers:
+        - image: europe-central2-docker.pkg.dev/vast-science-388818/online-shopping-app/customers-service
+          name: customers
+          env:
+            - name: APP_PORT
+              value: "9000"
+          envFrom:
+            - secretRef:
+                name: customers-env
+          ports:
+            - containerPort: 9000
+          resources:
+            requests:
+              memory: 100Mi
+              cpu: 100m
+            limits:
+              memory: 100Mi
+              cpu: 100m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: customers
+  labels:
+    app: customers
+spec:
+  type: ClusterIP
+  selector:
+    app: customers
+  ports:
+    - port: 9000
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: users-env
+data:
+  AMQP_URL: YW1xcDovL2d1ZXN0Omd1ZXN0QHJhYmJpdG1xOjU2NzI=
+  JWT_PRIVATE_KEY: TFMwdExTMUNSVWRKVGlCU1UwRWdVRkpKVmtGVVJTQkxSVmt0TFMwdExRMEtUVWxKUlhCUlNVSkJRVXREUVZGRlFXOWFNRFZNUlVNMWFWSlBOVGhKTTNoRlVIZHdaRE5wTTJkT2VVSXJNMW8xZFdwamVHZ3dWakIzTUU1dGVHbHpUUTBLWldkaVdVOVlkalZrY1c5WmNXTnhiM0J3Vlc5MVFrWmpXWFpxVUd0MVlYZHdjMWgzYkhRcll6WjRXVkZ3U25weVpYVnBTa3RyVVZkQlNVRTVWbGxyZWcwS01WUjZNblkwUldGd1pTczBTMnBwU1hwVmN6UldZMjlPWXpaelQzSkNRVzgyTnpCMmJqVmhORlZXVFhZd1NsTXpURE5qVDJaalQzcFhiVEJFTUZGVGNBMEtVM0ZGYW5CamJIbHJUMmhtSzFwWFFXMUlXa0ptYVc1R2RrTkROQ3QwYVZKVVVEQmxOSFJUYUZsVVFVbFZhbWczTkRaWlpqaGljMGhyU0hSV1YxbFBiQTBLWTJsNWFrVjBjREp0UTJoR1NYVlFhRFIyZUVkSloySmhkemR5V1ZGWVdUUXdOV2xaYjNOalUzbHZiazFuT1hRclkwcHVWMFJHTDJWWE5VeG9Na2hMZVEwS2JXRlJNMU5GTDNFclFsbG1aVWcxU0UxMmVrbFNOMWQ2TlVwQlFWTjBRek5xWldaVmNIZEpSRUZSUVVKQmIwbENRVU5OYzNwU2VrMXRXbFV3VEdWM2JBMEtaVXR3ZUhRM1ZFSkhWemsyYW5VdmExRlhieXRUVWtablJrdElURTFpY3k4NE1UZzNlbWxRTUhvM056aEdjRWxsUVdOaUx5OHZWRkZGYjA5WlJUbFhkQTBLVlVKV09GUXphMGhCYldoSlZGTmpSelJHYmtnNGRFczBUSFpIT0RrMWVDdFhSVWMxUjNoMGFsSnBSMGh2TVZoT1MwUnNSMlpsVW5WTVlUbFlUVGhLVUEwS1dXaHBjeTlKYVVocVYxcHNOMHR3UWswdk1tOTBRV0UzWVZoWWMyMTNZMkZTYWt4eFpTOWpRVmN6TW5oSVZIVjBkVXQ0UlhwSFpUWkdkV1ZoT1hoSlVnMEtkVUpvZHpSMmRsSmpkVzFsV2toNlZsUkZUVEpwYVd0VWFsZEtRbUZFVml0blJtZEdSRzFwV2xsd2IyOURhalE0ZVZsc2NtUjNjVEIzT0V4TWQxQnBSUTBLV1RFclV6QkRURTVDUnpsdlExZzJUMlZrV2tGek1XZFFjRTVUUjFZMWNGSXpjMDUzT0hsWmNsTjRUMDlOYUhFME1rWjRUM0JJWkZoNWVVbG5XRzVyZGcwS1YwUlRRbFpyUlVObldVVkJOV3B0VlRkNWRYWklXa1JwVTJsd01qSnVhR281YXpWbEsybDZaSFIxVkVkc1VVMUZXa3N4VkVGM1NXUjVObmhtV25CcFVRMEtSVlJCYnl0bFdtczVSbkJvVlRKaFJtdHZjSGM0TjBObGFEbHJjVXROUVdkVFFUZDRNbWRzYmtOeFVWaEVRM0pSWlhGdlZYRnNSV1kzVUVaUlQxTldUdzBLUjFGalJtZHdOWEIxYTB3M0t5czFaakZaVFVWNmVIVnpiV295UkU0eFNXUTBOSGt6VDBSelIzTkZkSGQwWm5rMWVXOU5PR1JXTUVObldVVkJjemRWTUEwS2JuZHFNMDV1UkdJMlpuRkpiR05zWTFBMVpsQTJTRzFIY1ZwaFVXeEtXWFZqYW1oeFFYWlNUME0yVERnME1HaFlkRTFrUVcxNFJrUnNUVWxqYzFBeWFnMEtPR2N4YkhSaU5VWm1ja1ZGYjNaTlZETlllR1ZSTXpoVFNWQmtUbXhUYnpSemJsbFVUMmwyVFc5eE5teFFhME4zVWpGSVdEZEROMmRvUkdZMU5VcDNOZzBLVmtGVU0zVTFkbmRhVURVeWNXWmlUV3cwYUVsSmFISlRVMnBTUldReGVGaDZSMFpqTjJSTlEyZFpSVUZuVFN0bE5FOUxWVXN2Y1hkWlkyRTBhMU4yYVEwS05HbERabE15U20wcmNtMTBNR2h1UzBRemNHRm5PR2htVnpKSGNWUjNSREZQYldsNmVFZzFMelZoWm1JMVNXNXpSMm95VkZSUlZqUTNXa1V6TkZkNk9RMEtiM1JQV25obFExVTBiMDVGTUdVemVXb3lPSGdyVFd4RVJEVk9SWGt6VW5ZMlpHcG1ORWRGTlhwd2JFUXlORlpZTkZkS1drRnVaamxpY0RoVlJqVlBLdzBLV0ZZMlVqbE5aM2g1WkcxeWVXMWpTVzVMU1c4MVdrVkRaMWxGUVcxVWFscEpkbVkzTHk5cUswdEhUWEZpWW5Zdk5GZEVTa3huWm1Zek1Ya3lOMVp0V0EwS1VrZEJRbFV6SzBaM04yOHlUVWgxVUM5R01HWkpjR1l6Y2xSQ1RWVnJVVkZ6ZFV4c1dUWTFWbWh2TTJKNlEzWkNUbXRzUWk5bU5uTk5SblJ5Vms1R2NBMEtRV2hDVjIxSVUySjRLMFp6YkhOWFJrSXliM0V4Wml0eFFXeElVSGxVU0VSTlluZERiRmd5UWpORWNIbGFjbmM0SzB3MlJEaHJRVFJMU0dsclNEZHJiUTBLVTNWaFFUSXlNRU5uV1VWQmVWbFRNRVV5V21kUVQwUnFibGdyZEN0U1NHcEliSEpXTUc1ck5VcFJaR05QWWk4MWFHeEVTUzl2ZGsxMmJtSnlUVFpYTkEwS1NETklZaTlXWVc5TlpEbGxUMGxsVlRKMFFVcDRiMWRZUmxBeE4zRmtVQzh6TlRRNWJ6ZFVVVzlIWlZkT1FXSXhRbGd5UjFoWk0ySk1jR05sTjJodmFRMEtSSFZHS3l0Q2NHOW9VblZDTHpoNlMxVXlOa3BNUzAxR1IwMXFlR0ZrWTJnMFZXb3daV1JuZEZVemRGQkZOakZDVjBoUE1rRkNZejBOQ2kwdExTMHRSVTVFSUZKVFFTQlFVa2xXUVZSRklFdEZXUzB0TFMwdA==
+  MONGO_CONNECTION_STRING: bW9uZ29kYjovL3VzZXJzX2RiX3VzZXI6cHNAbW9uZ28vdXNlcnNfZGI=
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: users
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: users
+  template:
+    metadata:
+      labels:
+        app: users
+    spec:
+      containers:
+        - image: europe-central2-docker.pkg.dev/vast-science-388818/online-shopping-app/users-service
+          name: users
+          env:
+            - name: APP_PORT
+              value: "9000"
+          envFrom:
+            - secretRef:
+                name: users-env
+          ports:
+            - containerPort: 9000
+          resources:
+            requests:
+              memory: 100Mi
+              cpu: 100m
+            limits:
+              memory: 100Mi
+              cpu: 100m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: users
+  labels:
+    app: users
+spec:
+  type: ClusterIP
+  selector:
+    app: users
+  ports:
+    - port: 9000
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: orders-env
+data:
+  AMQP_URL: YW1xcDovL2d1ZXN0Omd1ZXN0QHJhYmJpdG1xOjU2NzI=
+  JWT_PUBLIC_KEY: TFMwdExTMUNSVWRKVGlCUVZVSk1TVU1nUzBWWkxTMHRMUzBOQ2sxSlNVSkpha0ZPUW1kcmNXaHJhVWM1ZHpCQ1FWRkZSa0ZCVDBOQlVUaEJUVWxKUWtOblMwTkJVVVZCYjFvd05VeEZRelZwVWs4MU9Fa3plRVZRZDNBTkNtUXphVE5uVG5sQ0t6TmFOWFZxWTNob01GWXdkekJPYlhocGMwMWxaMkpaVDFoMk5XUnhiMWx4WTNGdmNIQlZiM1ZDUm1OWmRtcFFhM1ZoZDNCeldIY05DbXgwSzJNMmVGbFJjRXA2Y21WMWFVcExhMUZYUVVsQk9WWlphM294VkhveWRqUkZZWEJsS3pSTGFtbEplbFZ6TkZaamIwNWpObk5QY2tKQmJ6WTNNSFlOQ200MVlUUlZWazEyTUVwVE0wd3pZMDltWTA5NlYyMHdSREJSVTNCVGNVVnFjR05zZVd0UGFHWXJXbGRCYlVoYVFtWnBia1oyUTBNMEszUnBVbFJRTUdVTkNqUjBVMmhaVkVGSlZXcG9OelEyV1dZNFluTklhMGgwVmxkWlQyeGphWGxxUlhSd01tMURhRVpKZFZCb05IWjRSMGxuWW1GM04zSlpVVmhaTkRBMWFWa05DbTl6WTFONWIyNU5aemwwSzJOS2JsZEVSaTlsVnpWTWFESklTM2x0WVZFelUwVXZjU3RDV1dabFNEVklUWFo2U1ZJM1YzbzFTa0ZCVTNSRE0ycGxabFVOQ25CM1NVUkJVVUZDRFFvdExTMHRMVVZPUkNCUVZVSk1TVU1nUzBWWkxTMHRMUzA9
+  MONGO_CONNECTION_STRING: bW9uZ29kYjovL29yZGVyc19kYl91c2VyOnBzQG1vbmdvL29yZGVyc19kYg==
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orders
+  template:
+    metadata:
+      labels:
+        app: orders
+    spec:
+      containers:
+        - image: europe-central2-docker.pkg.dev/vast-science-388818/online-shopping-app/orders-service
+          name: orders
+          env:
+            - name: APP_PORT
+              value: "9000"
+          envFrom:
+            - secretRef:
+                name: orders-env
+          ports:
+            - containerPort: 9000
+          resources:
+            requests:
+              memory: 100Mi
+              cpu: 100m
+            limits:
+              memory: 100Mi
+              cpu: 100m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders
+  labels:
+    app: orders
+spec:
+  type: ClusterIP
+  selector:
+    app: orders
+  ports:
+    - port: 9000
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-conf
+data:
+  default.conf.template: |
+    server {
+      listen 80;
+      server_name _;
+    
+      resolver kube-dns.kube-system.svc.cluster.local ipv6=off;
+    
+      location /products {
+      if ($request_method = 'OPTIONS') {
+      # add cors headers
+      add_header 'Access-Control-Allow-Origin' '*';
+      add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, DELETE, PATCH, PUT';
+      add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
+    
+      add_header 'Access-Control-Max-Age' 1728000;
+      add_header 'Content-Type' 'text/plain; charset=utf-8';
+      add_header 'Content-Length' 0;
+    
+      return 204;
+      }
+    
+      # add cors headers
+      add_header 'Access-Control-Allow-Origin' '*' always;
+      add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, DELETE, PATCH, PUT' always;
+      add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+      add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
+    
+      proxy_pass http://products:9000;
+      }
+    
+      location /basket {
+      if ($request_method = 'OPTIONS') {
+      # add cors headers
+      add_header 'Access-Control-Allow-Origin' '*';
+      add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, DELETE, PATCH, PUT';
+      add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
+    
+      add_header 'Access-Control-Max-Age' 1728000;
+      add_header 'Content-Type' 'text/plain; charset=utf-8';
+      add_header 'Content-Length' 0;
+    
+      return 204;
+      }
+    
+      # add cors headers
+      add_header 'Access-Control-Allow-Origin' '*' always;
+      add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, DELETE, PATCH, PUT' always;
+      add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+      add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range,Basket-Session-Id' always;
+    
+      proxy_pass http://basket:9000;
+      }
+    
+      location /customers {
+      if ($request_method = 'OPTIONS') {
+      # add cors headers
+      add_header 'Access-Control-Allow-Origin' '*';
+      add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, DELETE, PATCH, PUT';
+      add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
+    
+      add_header 'Access-Control-Max-Age' 1728000;
+      add_header 'Content-Type' 'text/plain; charset=utf-8';
+      add_header 'Content-Length' 0;
+    
+      return 204;
+      }
+    
+      # add cors headers
+      add_header 'Access-Control-Allow-Origin' '*' always;
+      add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, DELETE, PATCH, PUT' always;
+      add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+      add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
+    
+      proxy_pass http://customers:9000;
+      }
+    
+      location /users {
+      if ($request_method = 'OPTIONS') {
+      # add cors headers
+      add_header 'Access-Control-Allow-Origin' '*';
+      add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, DELETE, PATCH, PUT';
+      add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
+    
+      add_header 'Access-Control-Max-Age' 1728000;
+      add_header 'Content-Type' 'text/plain; charset=utf-8';
+      add_header 'Content-Length' 0;
+    
+      return 204;
+      }
+    
+      # add cors headers
+      add_header 'Access-Control-Allow-Origin' '*' always;
+      add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, DELETE, PATCH, PUT' always;
+      add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+      add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
+    
+      proxy_pass http://users:9000;
+      }
+    
+      location /orders {
+      if ($request_method = 'OPTIONS') {
+      # add cors headers
+      add_header 'Access-Control-Allow-Origin' '*';
+      add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, DELETE, PATCH, PUT';
+      add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
+    
+      add_header 'Access-Control-Max-Age' 1728000;
+      add_header 'Content-Type' 'text/plain; charset=utf-8';
+      add_header 'Content-Length' 0;
+    
+      return 204;
+      }
+    
+      # add cors headers
+      add_header 'Access-Control-Allow-Origin' '*' always;
+      add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, DELETE, PATCH, PUT' always;
+      add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+      add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
+    
+      proxy_pass http://orders:9000;
+      }
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.23.2
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/templates/
+              readOnly: true
+          resources:
+            requests:
+              memory: 100Mi
+              cpu: 100m
+            limits:
+              memory: 100Mi
+              cpu: 100m
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: nginx-conf
+            items:
+              - key: default.conf.template
+                path: default.conf.template
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    app: web
+spec:
+  type: LoadBalancer
+  selector:
+    app: web
+  ports:
+    - port: 80
+      targetPort: 80
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: frontend-env
+data:
+  API_BACKEND_HOST: aHR0cDovLzM0LjExOC4xMDYuMjEyLw==
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - image: europe-central2-docker.pkg.dev/vast-science-388818/online-shopping-app/frontend
+          name: frontend
+          envFrom:
+            - secretRef:
+                name: frontend-env
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: 100Mi
+              cpu: 100m
+            limits:
+              memory: 100Mi
+              cpu: 100m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  labels:
+    app: frontend
+spec:
+  type: LoadBalancer
+  selector:
+    app: frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---

@@ -46,7 +46,6 @@ module.exports = fp(async function rabbitPlugin(fastify, opts) {
         durable: true
     })
     await ch2.bindQueue('basket_create_product', 'product', 'product.created')
-    await ch2.prefetch(5)
 
     fastify.addHook('onReady', async function () {
         await ch2.consume('basket_create_product', async function (message) {
@@ -66,7 +65,7 @@ module.exports = fp(async function rabbitPlugin(fastify, opts) {
                 ch2.reject(message, true)
             }
 
-        }, { noAck: false, consumerTag })
+        }, { noAck: false, consumerTag, prefetchCount: 5 })
 
         fastify.log.info('Consumer started')
     })

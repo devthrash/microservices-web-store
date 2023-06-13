@@ -10,7 +10,7 @@ const isActive = ref(false)
   <nav class="navbar">
     <div class="navbar-brand">
       <router-link class="navbar-item" :to="{path: '/'}">
-        <img src="@/assets/logo.png" alt="App logo" width="73" height="28">
+        <img src="@/assets/logo.png" alt="App logo" width="162" height="28">
       </router-link>
       <div class="navbar-burger" :class="{ 'is-active': isActive }" @click="isActive = !isActive">
         <span></span>

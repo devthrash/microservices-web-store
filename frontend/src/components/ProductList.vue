@@ -18,12 +18,12 @@ const { page, getPreviousPage, getNextPage } = usePaginator()
 const products = ref<IProduct[]>([])
 const total = ref<number>(0)
 const perPage = 40
-const { category, brand, minPrice, maxPrice } = useProductFilters()
+const { category, brand, minPrice, maxPrice, specs } = useProductFilters()
 
 watch(() => page.value, () => fetchProducts())
 watch(() => props.category, () => fetchProducts())
 watch(() => props.search, () => fetchProducts())
-watch([category, brand, minPrice, maxPrice], () => fetchProducts())
+watch([category, brand, minPrice, maxPrice, specs], () => fetchProducts())
 
 async function fetchProducts() {
     let response
@@ -35,11 +35,12 @@ async function fetchProducts() {
             category: category.value,
             brand: brand.value,
             minPrice: minPrice.value,
-            maxPrice: maxPrice.value
+            maxPrice: maxPrice.value,
+            ...specs.value
         })
 
         const store = useSearchFiltersStore()
-        store.setFilters(response.categories, response.brands, response.minPrice, response.maxPrice, response.prices)
+        store.setFilters(response.categories, response.brands, /**response.minPrice, response.maxPrice,*/ response.prices, response.specs)
     } else {
         response = await getProducts(page.value, perPage)
     }
@@ -55,7 +56,7 @@ await fetchProducts()
     <template v-if="products.length">
         <div class="columns is-multiline is-mobile">
             <div
-                class="column is-one-quarter-widescreen is-one-quarter-desktop is-one-quarter-fullhd is-half-mobile is-half-tablet"
+                class="column is-one-quarter-widescreen is-one-quarter-desktop is-one-quarter-fullhd is-half-mobile is-half-tablet is-flex"
                 v-for="product in products"
                 :key="product._id"
             >

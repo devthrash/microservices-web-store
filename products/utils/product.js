@@ -75,7 +75,8 @@ module.exports.searchProducts = async (mongo, opts) => {
         minPrice,
         maxPrice,
         page,
-        perPage
+        perPage,
+        ...specs
     } = opts
 
     const otherFilters = {}
@@ -94,6 +95,19 @@ module.exports.searchProducts = async (mongo, opts) => {
         otherFilters.price = { $gt: minPrice}
     } else if (maxPrice) {
         otherFilters.price = { $lt: maxPrice }
+    }
+
+    if (Object.keys(specs).length > 0) {
+        otherFilters.specs = { $all: [] }
+
+        for (const spec in specs) {
+            otherFilters.specs.$all.push({
+                $elemMatch: {
+                    name: spec,
+                    value: specs[spec]
+                }
+            })
+        }
     }
 
     return mongo.db.collection('products').aggregate([
@@ -119,28 +133,28 @@ module.exports.searchProducts = async (mongo, opts) => {
                 total: [
                     { $count: 'count' }
                 ],
-                minPrice: [
-                    {
-                        $sort: { price: 1 }
-                    },
-                    {
-                        $limit: 1
-                    },
-                    {
-                        $project: { price: 1 }
-                    }
-                ],
-                maxPrice: [
-                    {
-                        $sort: { price: -1 }
-                    },
-                    {
-                        $limit: 1
-                    },
-                    {
-                        $project: { price: 1 }
-                    }
-                ],
+                // minPrice: [
+                //     {
+                //         $sort: { price: 1 }
+                //     },
+                //     {
+                //         $limit: 1
+                //     },
+                //     {
+                //         $project: { price: 1 }
+                //     }
+                // ],
+                // maxPrice: [
+                //     {
+                //         $sort: { price: -1 }
+                //     },
+                //     {
+                //         $limit: 1
+                //     },
+                //     {
+                //         $project: { price: 1 }
+                //     }
+                // ],
                 brands: [
                     { $sortByCount: "$brand.name" }
                 ],
@@ -205,23 +219,46 @@ module.exports.searchProducts = async (mongo, opts) => {
                             }
                         }
                     }
+                ],
+                specs: [
+                    { $unwind: '$specs' },
+                    {
+                        $group: {
+                            _id: {
+                                name: '$specs.name',
+                                value: '$specs.value'
+                            },
+                            count: { $sum: 1 }
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: '$_id.name',
+                            values: {
+                                $push: {
+                                    value: '$_id.value',
+                                    count: '$count'
+                                }
+                            }
+                        }
+                    }
                 ]
             }
         },
         {
             $unwind: '$total'
         },
-        {
-            $unwind: '$minPrice'
-        },
-        {
-            $unwind: '$maxPrice'
-        },
+        // {
+        //     $unwind: '$minPrice'
+        // },
+        // {
+        //     $unwind: '$maxPrice'
+        // },
         {
             $addFields: {
                 total: '$total.count',
-                minPrice: '$minPrice.price',
-                maxPrice: '$maxPrice.price'
+                // minPrice: '$minPrice.price',
+                // maxPrice: '$maxPrice.price'
             }
         }
     ]).next()
@@ -251,6 +288,15 @@ module.exports.createIndexes = async (mongo) => {
 
     await collection.createIndex({
         price: 1
+    })
+
+    await collection.createIndex({
+        'brand.name': 1
+    })
+
+    await collection.createIndex({
+        'specs.name': 1,
+        'specs.value': 1
     })
 }
 
