@@ -23,7 +23,7 @@ const { category, brand, minPrice, maxPrice, specs } = useProductFilters()
 watch(() => page.value, () => fetchProducts())
 watch(() => props.category, () => fetchProducts())
 watch(() => props.search, () => fetchProducts())
-watch([category, brand, minPrice, maxPrice, specs], () => fetchProducts())
+watch([category, brand, minPrice, maxPrice, specs], () => fetchProducts(), { deep: true })
 
 async function fetchProducts() {
     let response

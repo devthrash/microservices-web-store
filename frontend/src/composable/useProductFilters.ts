@@ -1,5 +1,5 @@
 import { useRoute } from "vue-router";
-import { ref, watch } from "vue";
+import { reactive, ref, watch } from "vue";
 
 interface Specs {
     [key: string]: string
@@ -39,7 +39,12 @@ export function useProductFilters() {
                 maxPrice.value = undefined
             }
 
-            specs.value = {}
+            // clear specs object
+            for (const key in specs.value){
+                if (specs.value.hasOwnProperty(key)){
+                    delete specs.value[key];
+                }
+            }
             for (const [spec, value] of Object.entries(newQuery).filter((i) => !['category', 'brand', 'minPrice', 'maxPrice', 'page'].includes(i[0]))) {
                 if (typeof value === 'string') {
                     specs.value[spec] = value
